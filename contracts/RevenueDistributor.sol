@@ -35,7 +35,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
 
     function claim(uint256[] memory transactionAmounts,uint256[] memory transactionTimestamps, uint256 userInitialBalance) external nonReentrant {
         uint256 userClaimAmount = pendingRewards(msg.sender, transactionAmounts, transactionTimestamps,userInitialBalance);
-        require(userClaimAmount > 0, "No rewards to claim");
+        require(userClaimAmount > 0);
 
         userClaimTimestamp[msg.sender] = block.timestamp;
 
@@ -64,13 +64,12 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         uint256[] memory amounts,
         uint256[] memory timestamps,
         uint256 initialBalance) internal view returns (uint256) {
-        uint256 userClaimTime = userClaimTimestamp[account];
-        uint256 hoursToSeconds = 3600;
+        
 
         (uint256 elapsedTimeInitial, uint256 elapsedTimeTxn, uint256 elapsedTimeCurrent,
          uint256 additionalTokens,uint256 firstTxnTimestamp,uint256 lastTxnTimestamp ) = (0, 0, 0, 0, 0, 0);
 
-        uint256 timeSinceLastClaim = block.timestamp.sub(userClaimTime);
+        uint256 timeSinceLastClaim = block.timestamp.sub(userClaimTimestamp[account]);
         if (timeSinceLastClaim < revenuePeriod) {
             return 0;
         }
@@ -89,23 +88,38 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
 
         if (firstTxnTimestamp > 0) {
             elapsedTimeTxn = lastTxnTimestamp - firstTxnTimestamp;
-            elapsedTimeInitial = userClaimTime == 0 ? firstTxnTimestamp.sub(block.timestamp - revenuePeriod) : firstTxnTimestamp.sub(userClaimTime);
+            elapsedTimeInitial = userClaimTimestamp[account] == 0 ? firstTxnTimestamp.sub(block.timestamp - revenuePeriod) : firstTxnTimestamp.sub(userClaimTimestamp[account]);
             elapsedTimeCurrent = block.timestamp.sub(lastTxnTimestamp);
         }
         else {
-            elapsedTimeInitial = userClaimTime == 0 ? block.timestamp.sub(revenuePeriod) : timeSinceLastClaim;
+            elapsedTimeInitial = userClaimTimestamp[account] == 0 ? block.timestamp.sub(revenuePeriod) : timeSinceLastClaim;
         }
 
+        uint256 reward = _calculateShare(account,  elapsedTimeInitial,  elapsedTimeTxn,  elapsedTimeCurrent, additionalTokens, initialBalance);
+
         
+        return reward;
         
-        uint256 accountBalance = token.balanceOf(account);
+    }
+
+
+    function _calculateShare(
+        address _account,
+        uint256 _elapsedTimeInitial,
+        uint256 _elapsedTimeTxn,
+        uint256 _elapsedTimeCurrent,
+        uint256 _initialBalance,
+        uint256 _additionalTokens
+    ) internal view returns(uint256){
+        uint256 hoursToSeconds = 3600;
+        uint256 accountBalance = token.balanceOf(_account);
         uint256 totalSupply = token.totalSupply();
         uint256 userHoldPercent = percentageOf(accountBalance, totalSupply);
-        uint256 userAdditionalPercent = percentageOf(additionalTokens, totalSupply);
-        uint256 userInitialPercent = percentageOf(initialBalance, totalSupply);
-        uint256 initial_balance_share = userInitialPercent.mul(elapsedTimeInitial.div(hoursToSeconds.mul(24))) ; 
-        uint256 additional_token_share = userAdditionalPercent.mul(elapsedTimeTxn.div(hoursToSeconds.mul(24)));
-        uint256 current_balance_share = userHoldPercent.mul(elapsedTimeCurrent.div(hoursToSeconds.mul(24))) ; 
+        uint256 userAdditionalPercent = percentageOf(_additionalTokens, totalSupply);
+        uint256 userInitialPercent = percentageOf(_initialBalance, totalSupply);
+        uint256 initial_balance_share = userInitialPercent.mul(_elapsedTimeInitial.div(hoursToSeconds.mul(24))) ; 
+        uint256 additional_token_share = userAdditionalPercent.mul(_elapsedTimeTxn.div(hoursToSeconds.mul(24)));
+        uint256 current_balance_share = userHoldPercent.mul(_elapsedTimeCurrent.div(hoursToSeconds.mul(24))) ; 
         
 
         
@@ -129,12 +143,12 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     function percent(
         uint256 percentage,
         uint256 total
-    ) public pure returns (uint256) {
+    ) internal pure returns (uint256) {
         return (total * percentage) / 10000;
     }
 
     // Function to calculate the percentage of X is of Y
-    function percentageOf(uint256 x, uint256 y) public pure returns (uint256) {
+    function percentageOf(uint256 x, uint256 y) internal pure returns (uint256) {
         return (x * 10000) / y;
     }
 
