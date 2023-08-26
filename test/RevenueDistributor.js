@@ -35,17 +35,13 @@ describe("RevenueDistributor",async function () {
     await time.increaseTo(await time.latest() + ONE_DAY_IN_SECS);
 
     const initialBalance = await mockToken.balanceOf(user.address);
-    console.log(
-      "initialBalance",
-      initialBalance
-    )
-    //await revenueDistributor.connect(user).claim([], [], initialBalance);
+
+    await revenueDistributor.connect(user).claim([], [], initialBalance);
 
     const userClaimTimestamp = await revenueDistributor.getUserLastClaimTimestamp(user.address);
     const userPendingRewards = await revenueDistributor.pendingRewards(user.address, [], [],initialBalance);
-    console.log(userClaimTimestamp);
-    console.log(userPendingRewards);
-   // expect(userClaimTimestamp).to.equal((await time.latest()).toNumber());
+    expect(userClaimTimestamp).to.equal(await time.latest());
+    expect(userPendingRewards).to.equal(0);
 
   });
 });
