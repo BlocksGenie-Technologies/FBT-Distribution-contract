@@ -10,4 +10,12 @@ module.exports = {
     },
     viaIR: true,
   },
+  networks: {
+    localhost: {
+      allowUnlimitedContractSize: true,
+    },
+    hardhat: {
+      allowUnlimitedContractSize: true,
+    },
+  },
 };
