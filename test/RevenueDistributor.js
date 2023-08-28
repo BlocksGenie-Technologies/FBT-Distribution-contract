@@ -64,6 +64,11 @@ describe("RevenueDistributor", async function () {
     expect(userAClaimTimestamp).to.equal(await time.latest());
     expect(userAPendingRewards).to.equal(0);
 
+
+    await owner.sendTransaction({
+      to: revenueDistributor.address,
+      value: ethers.utils.parseEther("1"),
+    });
     await time.increaseTo(await time.latest() + ONE_DAY_IN_SECS);
     console.log("24 hours later")
 
