@@ -11,6 +11,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
 
     IERC20 public token;
     uint256 public revenuePeriod;
+    uint256 public totalRewardDistributed;
 
     constructor(address _tokenAddress) {
         require(_tokenAddress != address(0), "Invalid tokenAddress");
@@ -48,6 +49,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
 
         (bool sent, ) = payable(msg.sender).call{value: userClaimAmount}("");
         require(sent, "Failed to send Ether");
+        totalRewardDistributed++;
     }
 
     /*
