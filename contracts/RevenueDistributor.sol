@@ -11,6 +11,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     uint256 public revenuePeriod;
     uint256 public totalRewardDistributed;
     uint256 public lastDistributionTimestamp;
+    uint256 private distributedAmount;
 
 
     struct UserDetails {
@@ -41,6 +42,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     }
 
     function distribute(UserDetails[] calldata  _userDetails) external payable onlyOwner{
+        distributedAmount = msg.value;
         for (uint256 i = 0; i < _userDetails.length; i++) {
             uint256 userClaimAmount = calculateShare(
                 _userDetails[i].user, 
@@ -62,6 +64,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         require(userClaimAmount > 0);
         require(address(this).balance >= userClaimAmount);
 
+        rewardClaimable[msg.sender] = 0;
         (bool sent, ) = payable(msg.sender).call{value: userClaimAmount}("");
         require(sent, "Failed to send Ether");
     }
@@ -149,11 +152,9 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         uint256 additionalTokenShare = (userAdditionalPercent * elapsedTimeTxn) / (hoursToSeconds * 24);
         uint256 currentBalanceShare = (userHoldPercent * elapsedTimeCurrent) / (hoursToSeconds * 24);
 
-        uint256 userHoldPercentInEth = (currentBalanceShare * address(this).balance) / 10000;
-        uint256 userAdditionalPercentInEth = (additionalTokenShare * address(this).balance) / 10000;
-        uint256 userInitialPercentInEth = (initialBalanceShare * address(this).balance) / 10000;
+        uint256 calculatedRewardPercent = initialBalanceShare + additionalTokenShare + currentBalanceShare;
 
-        return userHoldPercentInEth + userInitialPercentInEth + userAdditionalPercentInEth;
+        return calculatedRewardPercent * distributedAmount / 10000;
     }
 
     
