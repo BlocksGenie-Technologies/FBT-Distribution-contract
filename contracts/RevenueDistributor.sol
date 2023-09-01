@@ -7,11 +7,20 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "hardhat/console.sol";
 
 contract RevenueDistributor is Ownable, ReentrancyGuard {
-    mapping(address => uint256) public userClaimTimestamp;
-
     IERC20 public token;
     uint256 public revenuePeriod;
     uint256 public totalRewardDistributed;
+    uint256 public lastDistributionTimestamp;
+
+
+    struct UserDetails {
+        address  user;
+        uint256[]  timestamp;
+        uint256[]  amount;
+        uint256  last24HourBalance;
+    }
+
+    mapping(address => uint256) public rewardClaimable;
 
     constructor(address _tokenAddress) {
         require(_tokenAddress != address(0), "Invalid tokenAddress");
@@ -27,38 +36,47 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         token = IERC20(_tokenAddress);
     }
 
-    function getUserLastClaimTimestamp(address _account) external view returns(uint256){
-        return userClaimTimestamp[_account];
+    function getLastDistributionTime() view  external returns(uint256){
+        return lastDistributionTimestamp;
     }
 
-    function claim(
-        uint256[] memory transactionAmounts,
-        uint256[] memory transactionTimestamps,
-        uint256 userInitialBalance
-    ) external nonReentrant {
-        uint256 userClaimAmount = pendingRewards(
-            msg.sender,
-            transactionAmounts,
-            transactionTimestamps,
-            userInitialBalance
-        );
+    function distribute(UserDetails[] calldata  _userDetails) external payable onlyOwner{
+        for (uint256 i = 0; i < _userDetails.length; i++) {
+            uint256 userClaimAmount = calculateShare(
+                _userDetails[i].user, 
+                _userDetails[i].amount, 
+                _userDetails[i].timestamp, 
+                _userDetails[i].last24HourBalance
+            );
+
+            if (userClaimAmount > 0) {
+                rewardClaimable[_userDetails[i].user] += userClaimAmount;
+                totalRewardDistributed += userClaimAmount;
+            }
+        }
+        lastDistributionTimestamp = block.timestamp;
+    }
+
+    function claim() external nonReentrant {
+        uint256 userClaimAmount = rewardClaimable[msg.sender];
         require(userClaimAmount > 0);
         require(address(this).balance >= userClaimAmount);
 
-        userClaimTimestamp[msg.sender] = block.timestamp;
-
         (bool sent, ) = payable(msg.sender).call{value: userClaimAmount}("");
         require(sent, "Failed to send Ether");
-        totalRewardDistributed++;
     }
+
+ 
+    function pendingRewards(address account) external view returns (uint256) {
+        return rewardClaimable[account];
+    }
+
+
 
     /*
     Gets distributed to all holders of fbt tokens depending on how much fbt tokens they hold
 
     The more they hold the more rewards they get
-    */
-
-    /**
      * @dev Calculate pending rewards
      * @param account user address
      * @param amounts array of user additional amounts in last 24hr
@@ -66,7 +84,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
      * @param initialBalance user balance in last 24hr
      * @return Peding rewards
      */
-    function pendingRewards(
+    function calculateShare(
         address account,
         uint256[] memory amounts,
         uint256[] memory timestamps,
@@ -74,11 +92,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     ) public view returns (uint256) {
         require(amounts.length == timestamps.length);
 
-        uint256 timeSinceLastClaim = block.timestamp - userClaimTimestamp[account];
-        if (userClaimTimestamp[account] != 0 && timeSinceLastClaim < revenuePeriod) {
-            return 0;
-        }
-
+        uint256 timeSinceLastDistribute = block.timestamp - lastDistributionTimestamp;
         uint256 additionalTokens;
         uint256 firstTxnTimestamp = 0;
         uint256 lastTxnTimestamp = 0;
@@ -94,8 +108,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         }
 
         uint256 elapsedTimeTxn = lastTxnTimestamp - firstTxnTimestamp;
-        uint256 elapsedTimeInitial = firstTxnTimestamp == 0 ? userClaimTimestamp[account] == 0 ? 86400 : timeSinceLastClaim
-        : userClaimTimestamp[account] == 0 ? firstTxnTimestamp - block.timestamp - revenuePeriod : firstTxnTimestamp - userClaimTimestamp[account];
+        uint256 elapsedTimeInitial = firstTxnTimestamp == 0 ? revenuePeriod : firstTxnTimestamp - timeSinceLastDistribute;
 
         uint256 elapsedTimeCurrent = lastTxnTimestamp == 0 ? 0 :  block.timestamp - lastTxnTimestamp;
 
@@ -114,26 +127,27 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
 
 
     /* function to calculate the share of the caller address, summation of percentage of the last 24hrs balance, 
-    addtional amounts gotten from transactions within 24hrs and the user current balance multiple by their respective elapsed timestamps */
+    addtional amounts gotten from transactions within 24hrs and the user current balance multiple by their respective elapsed timestamps
+    */
     function _calculateShare(
         address _account,
-        uint256 _elapsedTimeInitial,
-        uint256 _elapsedTimeTxn,
-        uint256 _elapsedTimeCurrent,
-        uint256 _initialBalance,
-        uint256 _additionalTokens
+        uint256 elapsedTimeInitial,
+        uint256 elapsedTimeTxn,
+        uint256 elapsedTimeCurrent,
+        uint256 initialBalance,
+        uint256 additionalTokens
     ) internal view returns (uint256) {
         uint256 hoursToSeconds = 3600;
         uint256 accountBalance = token.balanceOf(_account);
         uint256 totalSupply = token.totalSupply();
 
         uint256 userHoldPercent = (accountBalance * 10000) / totalSupply;
-        uint256 userAdditionalPercent = (_additionalTokens * 10000) / totalSupply;
-        uint256 userInitialPercent = (_initialBalance * 10000) / totalSupply;
+        uint256 userAdditionalPercent = (additionalTokens * 10000) / totalSupply;
+        uint256 userInitialPercent = (initialBalance * 10000) / totalSupply;
 
-        uint256 initialBalanceShare = (userInitialPercent * _elapsedTimeInitial) / (hoursToSeconds * 24);
-        uint256 additionalTokenShare = (userAdditionalPercent * _elapsedTimeTxn) / (hoursToSeconds * 24);
-        uint256 currentBalanceShare = (userHoldPercent * _elapsedTimeCurrent) / (hoursToSeconds * 24);
+        uint256 initialBalanceShare = (userInitialPercent * elapsedTimeInitial) / (hoursToSeconds * 24);
+        uint256 additionalTokenShare = (userAdditionalPercent * elapsedTimeTxn) / (hoursToSeconds * 24);
+        uint256 currentBalanceShare = (userHoldPercent * elapsedTimeCurrent) / (hoursToSeconds * 24);
 
         uint256 userHoldPercentInEth = (currentBalanceShare * address(this).balance) / 10000;
         uint256 userAdditionalPercentInEth = (additionalTokenShare * address(this).balance) / 10000;
