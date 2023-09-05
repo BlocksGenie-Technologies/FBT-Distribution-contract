@@ -175,4 +175,11 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
 
         return (calculatedRewardPercent * distributedAmount) / 10000;
     }
+
+    function emergencyWithdraw() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0);
+        (bool sent, ) = payable(msg.sender).call{value: balance}("");
+        require(sent, "Failed to send Ether");
+    }
 }
