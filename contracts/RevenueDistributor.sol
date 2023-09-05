@@ -22,6 +22,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     }
 
     mapping(address => uint256) public rewardClaimable;
+    mapping(address => bool)private isBlacklist;
 
     modifier onlyManager() {
         require(msg.sender == manager, "Not manager");
@@ -52,11 +53,18 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         return lastDistributionTimestamp;
     }
 
+    function blacklist(address[] memory a) external onlyManager{
+      for(uint256 i = 0; i < a.length; i){
+        isBlacklist[a[i]] = true;
+      }
+    }
+
     function distribute(
         UserDetails[] calldata _userDetails
     ) external payable onlyManager {
         distributedAmount = msg.value;
         for (uint256 i = 0; i < _userDetails.length; i++) {
+            require(!isBlacklist[_userDetails[i].user]);
             uint256 userClaimAmount = calculateShare(
                 _userDetails[i].user,
                 _userDetails[i].amount,
