@@ -15,12 +15,10 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
 
     struct UserDetails {
         address user;
-        uint256[] timestamp;
-        uint256[] amount;
-        uint256 last24HourBalance;
+        uint256 reward;
     }
 
-    mapping(address => uint256) public rewardClaimable;
+    mapping(address => UserDetails) public rewardClaimable;
     mapping(address => bool) private isBlacklist;
 
     modifier onlyManager() {
@@ -60,48 +58,33 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     }
 
     function distribute(
-        UserDetails[] calldata _userDetails,
-        uint256 distributedAmount
+        UserDetails[] calldata _userDetails
     ) external payable onlyManager {
-        require(
-            address(this).balance >= distributedAmount,
-            "Insufficient funds"
-        );
+
         for (uint256 i = 0; i < _userDetails.length; i++) {
             require(!isBlacklist[_userDetails[i].user]);
-            uint256 userClaimAmount = calculateShare(
-                distributedAmount,
-                _userDetails[i].user,
-                _userDetails[i].amount,
-                _userDetails[i].timestamp,
-                _userDetails[i].last24HourBalance
-            );
-
-            console.log("Wallet", _userDetails[i].user);
-
-            rewardClaimable[_userDetails[i].user] += userClaimAmount;
+            uint256 userClaimAmount = _userDetails[i].reward;
+            rewardClaimable[_userDetails[i].user].user = _userDetails[i].user;
+            rewardClaimable[_userDetails[i].user].reward += userClaimAmount;
             totalRewardDistributed += userClaimAmount;
-            console.log(
-                "Distribution amount",
-                rewardClaimable[_userDetails[i].user]
-            );
+
         }
         lastDistributionTimestamp = block.timestamp;
     }
 
     function claim() external nonReentrant {
         console.log("user", msg.sender);
-        uint256 userClaimAmount = rewardClaimable[msg.sender];
+        uint256 userClaimAmount = rewardClaimable[msg.sender].reward;
         require(userClaimAmount > 0, "Nothing to claim");
         require(address(this).balance >= userClaimAmount, "Insufficient funds");
 
-        rewardClaimable[msg.sender] = 0;
+        rewardClaimable[msg.sender].reward = 0;
         (bool sent, ) = payable(msg.sender).call{value: userClaimAmount}("");
         require(sent, "Failed to send Ether");
     }
 
     function pendingRewards(address account) external view returns (uint256) {
-        return rewardClaimable[account];
+        return rewardClaimable[account].reward;
     }
 
     /*

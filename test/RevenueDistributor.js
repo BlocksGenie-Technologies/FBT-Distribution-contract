@@ -3,6 +3,9 @@ const {
   time, } = require("@nomicfoundation/hardhat-network-helpers");
 const { expect } = require("chai");
 
+
+
+
 describe("RevenueDistributor", async function () {
   let revenueDistributor;
   let mockToken;
@@ -23,13 +26,19 @@ describe("RevenueDistributor", async function () {
     await mockToken.transfer(userC.address, ethers.utils.parseUnits("250"));
 
     const RevenueDistributor = await ethers.getContractFactory("RevenueDistributor");
-    revenueDistributor = await RevenueDistributor.deploy(mockToken.address);
+    revenueDistributor = await RevenueDistributor.deploy(mockToken.address, owner.address);
     await revenueDistributor.deployed();
 
-    /*await owner.sendTransaction({
+    const distributedAmount = ethers.utils.parseEther("1");
+    const lastDistributionTimestamp = await revenueDistributor.getLastDistributionTime();
+    const revenuePeriod = 86400
+    const hoursToSeconds = 3600;
+    const totalSupply = await mockToken.totalSupply();
+
+    await owner.sendTransaction({
       to: revenueDistributor.address,
-      value: ethers.utils.parseEther("1"),
-    });*/
+      value: distributedAmount,
+    });
 
     const currentTimestamp =  Math.floor(new Date().getTime() / 1000);
     const timestamp12HoursAgo = currentTimestamp - 12 * 60 * 60;
@@ -38,29 +47,99 @@ describe("RevenueDistributor", async function () {
     const timestamp8HoursAgo = currentTimestamp - 8 * 60 * 60;
     const timestamp1HourAgo = currentTimestamp - 1 * 60 * 60;
 
+    async function calculateShare(
+      account,
+      amounts,
+      timestamps,
+      initialBalance
+    ) {
+      console.log("account", account)
+      console.log("amounts", amounts)
+      console.log("timestamps", timestamps)
+      console.log("initialBalance", initialBalance)
+      if (amounts.length !== timestamps.length) {
+        throw new Error("Amounts and timestamps arrays must have the same length");
+      }
+    
+      const timeSinceLastDistribute = (Date.now() / 1000) - lastDistributionTimestamp;
+      let additionalTokens = 0;
+      let firstTxnTimestamp = 0;
+      let lastTxnTimestamp = 0;
+    
+      for (let i = 0; i < amounts.length; i++) {
+        additionalTokens += amounts[i];
+        if (timestamps[i] < firstTxnTimestamp || firstTxnTimestamp === 0) {
+          firstTxnTimestamp = timestamps[i];
+        }
+        if (timestamps[i] > lastTxnTimestamp) {
+          lastTxnTimestamp = timestamps[i];
+        }
+      }
+    
+      const elapsedTimeTxn = lastTxnTimestamp - firstTxnTimestamp;
+      const elapsedTimeInitial = firstTxnTimestamp === 0 ? revenuePeriod : firstTxnTimestamp - timeSinceLastDistribute;
+      const elapsedTimeCurrent = lastTxnTimestamp === 0 ? 0 : (Date.now() / 1000) - lastTxnTimestamp;
+
+      console.log("elapsedTimeTxn: " + elapsedTimeTxn)
+      console.log("elapsedTimeInitial: " + elapsedTimeInitial)
+      console.log("elapsedTimeCurrent: " + elapsedTimeCurrent)
+
+
+      const accountBalance = await mockToken.balanceOf(account);
+      const userHoldPercent = (accountBalance * 100) / totalSupply;
+      const userAdditionalPercent = (additionalTokens * 100) / totalSupply;
+      const userInitialPercent = (initialBalance * 100) / totalSupply;
+
+      console.log("totalSupply: " + totalSupply)
+      console.log("accountBalance: " + accountBalance)
+      console.log("userHoldPercent: " + userHoldPercent)
+      console.log("userAdditionalPercent: " + userAdditionalPercent)
+      console.log("userInitialPercent: " + userInitialPercent)
+    
+      const initialBalanceShare = (userInitialPercent * elapsedTimeInitial) / (hoursToSeconds * 24);
+      const additionalTokenShare = (userAdditionalPercent * elapsedTimeTxn) / (hoursToSeconds * 24);
+      const currentBalanceShare = (userHoldPercent * elapsedTimeCurrent) / (hoursToSeconds * 24);
+    
+      const calculatedRewardPercent = initialBalanceShare + additionalTokenShare + currentBalanceShare;
+      console.log("calculatedRewardPercent", calculatedRewardPercent);
+      return (calculatedRewardPercent * distributedAmount) / 100;
+    }
+    
+       
 
     const details = [
       {
         user: userA.address,
-        timestamp: [],
-        amount: [],
-        last24HourBalance: ethers.utils.parseUnits("1000")
+        reward: await calculateShare(
+          userA.address,
+          [],
+          [],
+          await mockToken.balanceOf(userA.address)
+        ),
       },
       {
         user: userB.address,
-        timestamp: [],
-        amount: [],
-        last24HourBalance: ethers.utils.parseUnits("500")
+        reward: await calculateShare(
+          userB.address,
+          [],
+          [],
+          await mockToken.balanceOf(userB.address)
+        ),
       },
       {
         user: userC.address,
-        timestamp: [],
-        amount: [],
-        last24HourBalance: ethers.utils.parseUnits("250")
+        reward: await calculateShare(
+          userC.address,
+          [],
+          [],
+          await mockToken.balanceOf(userC.address)
+        ),
       }
     ]
 
-    await revenueDistributor.distribute(details,{from: owner.address, value: ethers.utils.parseEther('1')});
+    console.log("details", details)
+
+    await revenueDistributor.distribute(details);
   });
 
   it("should allow a user to claim a reward after 24 hours", async function () {
