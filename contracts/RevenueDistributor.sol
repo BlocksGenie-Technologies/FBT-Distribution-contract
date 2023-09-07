@@ -77,14 +77,13 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
             );
 
             console.log("Wallet", _userDetails[i].user);
-            if (userClaimAmount > 0) {
-                rewardClaimable[_userDetails[i].user] += userClaimAmount;
-                totalRewardDistributed += userClaimAmount;
-                console.log(
-                    "Distribution amount",
-                    rewardClaimable[_userDetails[i].user]
-                );
-            }
+
+            rewardClaimable[_userDetails[i].user] += userClaimAmount;
+            totalRewardDistributed += userClaimAmount;
+            console.log(
+                "Distribution amount",
+                rewardClaimable[_userDetails[i].user]
+            );
         }
         lastDistributionTimestamp = block.timestamp;
     }
@@ -197,7 +196,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
 
     function emergencyWithdraw() external onlyOwner {
         uint256 balance = address(this).balance;
-        require(balance > 0);
+        require(balance > 0, "Insufficient funds");
         (bool sent, ) = payable(msg.sender).call{value: balance}("");
         require(sent, "Failed to send Ether");
     }
