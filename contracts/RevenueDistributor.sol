@@ -34,6 +34,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         token = IERC20(_tokenAddress);
         manager = _manager;
         revenuePeriod = 1 days;
+        totalRewardDistributed = 0;
     }
 
     receive() external payable {}
