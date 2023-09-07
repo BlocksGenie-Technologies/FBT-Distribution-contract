@@ -59,9 +59,13 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     }
 
     function distribute(
-        UserDetails[] calldata _userDetails, uint256 distributedAmount
+        UserDetails[] calldata _userDetails,
+        uint256 distributedAmount
     ) external payable onlyManager {
-        require(address(this).balance >= distributedAmount, "Insufficient funds");
+        require(
+            address(this).balance >= distributedAmount,
+            "Insufficient funds"
+        );
         for (uint256 i = 0; i < _userDetails.length; i++) {
             require(!isBlacklist[_userDetails[i].user]);
             uint256 userClaimAmount = calculateShare(
@@ -145,8 +149,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
             ? 0
             : block.timestamp - lastTxnTimestamp;
 
-        uint256 reward = _calculateShare(
-            distributedAmount,
+        uint256 calculatedRewardPercent = _calculateShare(
             account,
             elapsedTimeInitial,
             elapsedTimeTxn,
@@ -155,14 +158,13 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
             additionalTokens
         );
 
-        return reward;
+        return (calculatedRewardPercent * distributedAmount) / 10000;
     }
 
     /* function to calculate the share of the caller address, summation of percentage of the last 24hrs balance, 
     addtional amounts gotten from transactions within 24hrs and the user current balance multiple by their respective elapsed timestamps
     */
     function _calculateShare(
-        uint256 distributedAmount,
         address _account,
         uint256 elapsedTimeInitial,
         uint256 elapsedTimeTxn,
@@ -190,7 +192,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
             additionalTokenShare +
             currentBalanceShare;
 
-        return (calculatedRewardPercent * distributedAmount) / 10000;
+        return calculatedRewardPercent;
     }
 
     function emergencyWithdraw() external onlyOwner {
