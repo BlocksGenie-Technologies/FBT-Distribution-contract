@@ -8,7 +8,6 @@ import "hardhat/console.sol";
 
 contract RevenueDistributor is Ownable, ReentrancyGuard {
     IERC20 public token;
-    uint256 public revenuePeriod;
     uint256 public totalRewardDistributed;
     uint256 public lastDistributionTimestamp;
     address public manager;
@@ -31,7 +30,6 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         require(_manager != address(0), "Invalid address");
         token = IERC20(_tokenAddress);
         manager = _manager;
-        revenuePeriod = 1 days;
         totalRewardDistributed = 0;
     }
 
@@ -85,97 +83,6 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
 
     function pendingRewards(address account) external view returns (uint256) {
         return rewardClaimable[account].reward;
-    }
-
-    /*
-    Gets distributed to all holders of fbt tokens depending on how much fbt tokens they hold
-
-    The more they hold the more rewards they get
-     * @dev Calculate pending rewards
-     * @param account user address
-     * @param amounts array of user additional amounts in last 24hr
-     * @param timestamps array of timestamps in last 24hr transactions
-     * @param initialBalance user balance in last 24hr
-     * @return Peding rewards
-     */
-    function calculateShare(
-        uint256 distributedAmount,
-        address account,
-        uint256[] memory amounts,
-        uint256[] memory timestamps,
-        uint256 initialBalance
-    ) public view returns (uint256) {
-        require(amounts.length == timestamps.length);
-
-        uint256 timeSinceLastDistribute = block.timestamp -
-            lastDistributionTimestamp;
-        uint256 additionalTokens;
-        uint256 firstTxnTimestamp = 0;
-        uint256 lastTxnTimestamp = 0;
-
-        for (uint256 i = 0; i < amounts.length; i++) {
-            additionalTokens += amounts[i];
-            if (timestamps[i] < firstTxnTimestamp) {
-                firstTxnTimestamp = timestamps[i];
-            }
-            if (timestamps[i] > lastTxnTimestamp) {
-                lastTxnTimestamp = timestamps[i];
-            }
-        }
-
-        uint256 elapsedTimeTxn = lastTxnTimestamp - firstTxnTimestamp;
-        uint256 elapsedTimeInitial = firstTxnTimestamp == 0
-            ? revenuePeriod
-            : firstTxnTimestamp - timeSinceLastDistribute;
-
-        uint256 elapsedTimeCurrent = lastTxnTimestamp == 0
-            ? 0
-            : block.timestamp - lastTxnTimestamp;
-
-        uint256 calculatedRewardPercent = _calculateShare(
-            account,
-            elapsedTimeInitial,
-            elapsedTimeTxn,
-            elapsedTimeCurrent,
-            initialBalance,
-            additionalTokens
-        );
-
-        return (calculatedRewardPercent * distributedAmount) / 10000;
-    }
-
-    /* function to calculate the share of the caller address, summation of percentage of the last 24hrs balance, 
-    addtional amounts gotten from transactions within 24hrs and the user current balance multiple by their respective elapsed timestamps
-    */
-    function _calculateShare(
-        address _account,
-        uint256 elapsedTimeInitial,
-        uint256 elapsedTimeTxn,
-        uint256 elapsedTimeCurrent,
-        uint256 initialBalance,
-        uint256 additionalTokens
-    ) internal view returns (uint256) {
-        uint256 hoursToSeconds = 3600;
-        uint256 accountBalance = token.balanceOf(_account);
-        uint256 totalSupply = token.totalSupply();
-
-        uint256 userHoldPercent = (accountBalance * 10000) / totalSupply;
-        uint256 userAdditionalPercent = (additionalTokens * 10000) /
-            totalSupply;
-        uint256 userInitialPercent = (initialBalance * 10000) / totalSupply;
-
-        uint256 initialBalanceShare = (userInitialPercent *
-            elapsedTimeInitial) / (hoursToSeconds * 24);
-        uint256 additionalTokenShare = (userAdditionalPercent *
-            elapsedTimeTxn) / (hoursToSeconds * 24);
-        uint256 currentBalanceShare = (userHoldPercent * elapsedTimeCurrent) /
-            (hoursToSeconds * 24);
-
-        uint256 calculatedRewardPercent = initialBalanceShare +
-            additionalTokenShare +
-            currentBalanceShare;
-
-        return calculatedRewardPercent;
     }
 
     function emergencyWithdraw() external onlyOwner {
