@@ -22,7 +22,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     }
 
     mapping(address => uint256) public rewardClaimable;
-    mapping(address => bool)private isBlacklist;
+    mapping(address => bool) private isBlacklist;
 
     modifier onlyManager() {
         require(msg.sender == manager, "Not manager");
@@ -53,16 +53,17 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         return lastDistributionTimestamp;
     }
 
-    function blacklist(address[] memory a) external onlyManager{
-      for(uint256 i = 0; i < a.length; i){
-        isBlacklist[a[i]] = true;
-      }
+    function blacklist(address[] memory a) external onlyManager {
+        for (uint256 i = 0; i < a.length; i) {
+            isBlacklist[a[i]] = true;
+        }
     }
 
     function distribute(
-        UserDetails[] calldata _userDetails
+        UserDetails[] calldata _userDetails, uint256 value
     ) external payable onlyManager {
-        distributedAmount = msg.value;
+        distributedAmount = value;
+        require(address(this).balance >= value, "Insufficient funds");
         for (uint256 i = 0; i < _userDetails.length; i++) {
             require(!isBlacklist[_userDetails[i].user]);
             uint256 userClaimAmount = calculateShare(
@@ -72,18 +73,24 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
                 _userDetails[i].last24HourBalance
             );
 
+            console.log("Wallet", _userDetails[i].user);
             if (userClaimAmount > 0) {
                 rewardClaimable[_userDetails[i].user] += userClaimAmount;
                 totalRewardDistributed += userClaimAmount;
+                console.log(
+                    "Distribution amount",
+                    rewardClaimable[_userDetails[i].user]
+                );
             }
         }
         lastDistributionTimestamp = block.timestamp;
     }
 
     function claim() external nonReentrant {
+        console.log("user", msg.sender);
         uint256 userClaimAmount = rewardClaimable[msg.sender];
-        require(userClaimAmount > 0);
-        require(address(this).balance >= userClaimAmount);
+        require(userClaimAmount > 0, "Nothing to claim");
+        require(address(this).balance >= userClaimAmount, "Insufficient funds");
 
         rewardClaimable[msg.sender] = 0;
         (bool sent, ) = payable(msg.sender).call{value: userClaimAmount}("");
