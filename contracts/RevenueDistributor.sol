@@ -11,7 +11,6 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     uint256 public revenuePeriod;
     uint256 public totalRewardDistributed;
     uint256 public lastDistributionTimestamp;
-    uint256 private distributedAmount;
     address public manager;
 
     struct UserDetails {
@@ -60,13 +59,13 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     }
 
     function distribute(
-        UserDetails[] calldata _userDetails, uint256 value
+        UserDetails[] calldata _userDetails, uint256 distributedAmount
     ) external payable onlyManager {
-        distributedAmount = value;
-        require(address(this).balance >= value, "Insufficient funds");
+        require(address(this).balance >= distributedAmount, "Insufficient funds");
         for (uint256 i = 0; i < _userDetails.length; i++) {
             require(!isBlacklist[_userDetails[i].user]);
             uint256 userClaimAmount = calculateShare(
+                distributedAmount,
                 _userDetails[i].user,
                 _userDetails[i].amount,
                 _userDetails[i].timestamp,
@@ -113,6 +112,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
      * @return Peding rewards
      */
     function calculateShare(
+        uint256 distributedAmount,
         address account,
         uint256[] memory amounts,
         uint256[] memory timestamps,
@@ -146,6 +146,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
             : block.timestamp - lastTxnTimestamp;
 
         uint256 reward = _calculateShare(
+            distributedAmount,
             account,
             elapsedTimeInitial,
             elapsedTimeTxn,
@@ -161,6 +162,7 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     addtional amounts gotten from transactions within 24hrs and the user current balance multiple by their respective elapsed timestamps
     */
     function _calculateShare(
+        uint256 distributedAmount,
         address _account,
         uint256 elapsedTimeInitial,
         uint256 elapsedTimeTxn,
