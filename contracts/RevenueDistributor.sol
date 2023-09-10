@@ -2,12 +2,10 @@
 pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "hardhat/console.sol";
 
 contract RevenueDistributor is Ownable, ReentrancyGuard {
-    IERC20 public token;
     uint256 public totalRewardDistributed;
     uint256 public lastDistributionTimestamp;
     address public manager;
@@ -25,20 +23,16 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor(address _tokenAddress, address _manager) {
-        require(_tokenAddress != address(0), "Invalid tokenAddress");
+    constructor(address _manager) {
         require(_manager != address(0), "Invalid address");
-        token = IERC20(_tokenAddress);
         manager = _manager;
         totalRewardDistributed = 0;
     }
 
-    receive() external payable {}
-
-    function setTokenAddress(address _tokenAddress) external onlyOwner {
-        require(_tokenAddress != address(0), "Invalid tokenAddress");
-        token = IERC20(_tokenAddress);
+    receive() external payable {
+        totalRewardDistributed += msg.value;
     }
+
 
     function setManagerAddress(address _manager) external onlyOwner {
         require(_manager != address(0), "Invalid address");
@@ -50,21 +44,20 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     }
 
     function blacklist(address[] memory a) external onlyManager {
-        for (uint256 i = 0; i < a.length; i) {
+        for (uint256 i = 0; i < a.length; i++) {
             isBlacklist[a[i]] = true;
         }
     }
 
     function distribute(
         UserDetails[] calldata _userDetails
-    ) external payable onlyManager {
+    ) external onlyManager {
 
         for (uint256 i = 0; i < _userDetails.length; i++) {
             require(!isBlacklist[_userDetails[i].user]);
             uint256 userClaimAmount = _userDetails[i].reward;
             rewardClaimable[_userDetails[i].user].user = _userDetails[i].user;
             rewardClaimable[_userDetails[i].user].reward += userClaimAmount;
-            totalRewardDistributed += userClaimAmount;
 
         }
         lastDistributionTimestamp = block.timestamp;
@@ -76,9 +69,10 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
         require(userClaimAmount > 0, "Nothing to claim");
         require(address(this).balance >= userClaimAmount, "Insufficient funds");
 
-        rewardClaimable[msg.sender].reward = 0;
         (bool sent, ) = payable(msg.sender).call{value: userClaimAmount}("");
         require(sent, "Failed to send Ether");
+
+        rewardClaimable[msg.sender].reward = 0;
     }
 
     function pendingRewards(address account) external view returns (uint256) {

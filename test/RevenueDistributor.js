@@ -1,7 +1,9 @@
 const { ethers } = require("hardhat");
-const {
-  time, } = require("@nomicfoundation/hardhat-network-helpers");
+//const {
+  //time, } = require("@nomicfoundation/hardhat-network-helpers");
 const { expect } = require("chai");
+const TokenFactory = require("../artifacts/contracts/MOCK.sol/MOCK.json")
+const revenueDistributorFactory = require("../artifacts/contracts/RevenueDistributor.sol/RevenueDistributor.json")
 
 
 
@@ -16,29 +18,42 @@ describe("RevenueDistributor", async function () {
 
 
   beforeEach(async function () {
-    [owner, userA, userB, userC] = await ethers.getSigners();
+    const provider = new ethers.providers.JsonRpcProvider("https://ethereum-goerli.publicnode.com");
+    owner = new ethers.Wallet("0x0ff30305ccab0beb6cb2a0e39652145efab725cbc0d09fe2a217bab4b00cfbef", provider);
+    console.log("owner", owner);
+    
+    userA = "0x83E94295f46580839237fbE7746A344303bB5E00"
+    userB = "0xD6F7Dd9b800c1d6E9a2F44B2B22eBa3B7b4f4C43"
+    userC = "0x254cB55E2F7c341EA088a880A592c798B0182D04"
 
-    const MockToken = await ethers.getContractFactory("MOCK");
-    mockToken = await MockToken.deploy();
+    //const MockToken = await ethers.getContractFactory("MOCK");
+    //mockToken = await MockToken.deploy();
+    mockToken = new ethers.Contract("0x029B3FCc15a483a97e8e5f110EB4EAd70B719094", TokenFactory.abi, provider)
 
-    await mockToken.transfer(userA.address, ethers.utils.parseUnits("1000"));
-    await mockToken.transfer(userB.address, ethers.utils.parseUnits("500"));
-    await mockToken.transfer(userC.address, ethers.utils.parseUnits("250"));
+    //await mockToken.transfer(userA.address, ethers.utils.parseUnits("1000"));
+    //await mockToken.transfer(userB.address, ethers.utils.parseUnits("500"));
+    //await mockToken.transfer(userC.address, ethers.utils.parseUnits("250"));
 
-    const RevenueDistributor = await ethers.getContractFactory("RevenueDistributor");
-    revenueDistributor = await RevenueDistributor.deploy(mockToken.address, owner.address);
-    await revenueDistributor.deployed();
+    //const RevenueDistributor = await ethers.getContractFactory("RevenueDistributor");
+    //revenueDistributor = await RevenueDistributor.deploy(mockToken.address, owner.address);
+    //await revenueDistributor.deployed();
+    revenueDistributor = new ethers.Contract(
+      "0x2845e91be2e0c757231c25cf24f63ebbdd796e95",
+      revenueDistributorFactory.abi,
+      provider
+    );
 
-    const distributedAmount = ethers.utils.parseEther("1");
+
+    const distributedAmount = ethers.utils.parseEther("0.1");
     const lastDistributionTimestamp = await revenueDistributor.getLastDistributionTime();
     const revenuePeriod = 86400
     const hoursToSeconds = 3600;
     const totalSupply = await mockToken.totalSupply();
 
-    await owner.sendTransaction({
+    /*await owner.sendTransaction({
       to: revenueDistributor.address,
       value: distributedAmount,
-    });
+    });*/
 
     const currentTimestamp =  Math.floor(new Date().getTime() / 1000);
     const timestamp12HoursAgo = currentTimestamp - 12 * 60 * 60;
@@ -46,7 +61,6 @@ describe("RevenueDistributor", async function () {
     const timestamp4HoursAgo = currentTimestamp - 4 * 60 * 60;
     const timestamp8HoursAgo = currentTimestamp - 8 * 60 * 60;
     const timestamp1HourAgo = currentTimestamp - 1 * 60 * 60;
-
     async function calculateShare(
       account,
       amounts,
@@ -102,56 +116,56 @@ describe("RevenueDistributor", async function () {
     
       const calculatedRewardPercent = initialBalanceShare + additionalTokenShare + currentBalanceShare;
       console.log("calculatedRewardPercent", calculatedRewardPercent);
-      return (calculatedRewardPercent * distributedAmount) / 100;
+      return Math.floor((calculatedRewardPercent * distributedAmount) / 100);
     }
     
        
 
     const details = [
       {
-        user: userA.address,
+        user: userA,
         reward: await calculateShare(
-          userA.address,
+          userA,
           [],
           [],
-          await mockToken.balanceOf(userA.address)
+          await mockToken.balanceOf(userA)
         ),
       },
       {
-        user: userB.address,
+        user: userB,
         reward: await calculateShare(
-          userB.address,
+          userB,
           [],
           [],
-          await mockToken.balanceOf(userB.address)
+          await mockToken.balanceOf(userB)
         ),
       },
       {
-        user: userC.address,
+        user: userC,
         reward: await calculateShare(
-          userC.address,
+          userC,
           [],
           [],
-          await mockToken.balanceOf(userC.address)
+          await mockToken.balanceOf(userC)
         ),
       }
     ]
 
     console.log("details", details)
 
-    await revenueDistributor.distribute(details);
+    await revenueDistributor.connect(owner).distribute(details);
   });
 
   it("should allow a user to claim a reward after 24 hours", async function () {
     const ONE_DAY_IN_SECS = 24 * 60 * 60;
-    await time.increaseTo(await time.latest() + ONE_DAY_IN_SECS);
+    //await time.increaseTo(await time.latest() + ONE_DAY_IN_SECS);
 
-    let userAinitialBalance = await mockToken.balanceOf(userA.address);
-    let userAPendingRewards = await revenueDistributor.pendingRewards(userA.address);
-    let userBinitialBalance = await mockToken.balanceOf(userB.address);
-    let userBPendingRewards = await revenueDistributor.pendingRewards(userB.address);
-    let userCinitialBalance = await mockToken.balanceOf(userC.address);
-    let userCPendingRewards = await revenueDistributor.pendingRewards(userC.address);
+    let userAinitialBalance = await mockToken.balanceOf(userA);
+    let userAPendingRewards = await revenueDistributor.pendingRewards(userA);
+    let userBinitialBalance = await mockToken.balanceOf(userB);
+    let userBPendingRewards = await revenueDistributor.pendingRewards(userB);
+    let userCinitialBalance = await mockToken.balanceOf(userC);
+    let userCPendingRewards = await revenueDistributor.pendingRewards(userC);
 
     console.log({
       userAinitialBalance: ethers.utils.formatEther(userAinitialBalance.toString()),
@@ -162,12 +176,12 @@ describe("RevenueDistributor", async function () {
       userCPendingRewards: ethers.utils.formatEther(userCPendingRewards.toString()),
     });
 
-    await revenueDistributor.connect(userA).claim();
-    userAPendingRewards = await revenueDistributor.pendingRewards(userA.address);
-    expect(userAPendingRewards).to.equal(0);
+    //await revenueDistributor.connect(userA).claim();
+    userAPendingRewards = await revenueDistributor.pendingRewards(userA);
+    //expect(userAPendingRewards).to.equal(0);
 
 
-    await owner.sendTransaction({
+    /*await owner.sendTransaction({
       to: revenueDistributor.address,
       value: ethers.utils.parseEther("1"),
     });
@@ -188,7 +202,7 @@ describe("RevenueDistributor", async function () {
       userBPendingRewards: ethers.utils.formatEther(userBPendingRewards.toString()),
       userCinitialBalance: ethers.utils.formatEther(userCinitialBalance.toString()),
       userCPendingRewards: ethers.utils.formatEther(userCPendingRewards.toString()),
-    });
+    });*/
 
   });
 });

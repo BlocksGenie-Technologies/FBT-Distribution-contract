@@ -6,16 +6,14 @@ module.exports = {
   settings: {
     optimizer: {
       enabled: true,
-      runs: 100,
+      runs: 1,
     },
-    viaIR: true,
+    evmVersion: 'paris',
   },
   networks: {
-    localhost: {
-      allowUnlimitedContractSize: true,
-    },
-    hardhat: {
-      allowUnlimitedContractSize: true,
-    },
-  },
+    goerli: {
+      url: "https://ethereum-goerli.publicnode.com",
+      accounts: ['0x0ff30305ccab0beb6cb2a0e39652145efab725cbc0d09fe2a217bab4b00cfbef'],
+    }
+  }
 };
