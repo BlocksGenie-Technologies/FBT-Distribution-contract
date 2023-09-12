@@ -38,8 +38,90 @@ describe("RevenueDistributor", async function () {
     await revenueDistributor.deployed();
   })
   
-  it("should allow a user to claim a reward after 24 hours", async function () {
+  it("should distribute", async function () {
     const distributedAmount = ethers.utils.parseUnits("3");
+    await owner.sendTransaction({
+      to: revenueDistributor.address,
+      value: distributedAmount
+    });
+    const contractEthBalance = await ethers.provider.getBalance(revenueDistributor.address);
+    console.log("contractEthBalance", contractEthBalance);
+    //expect(contractEthBalance).to.equal(ethers.utils.parseUnits("3"));
+
+
+    
+    const ONE_DAY_IN_SECS = 24 * 60 * 60;
+    await time.increaseTo(await time.latest() + ONE_DAY_IN_SECS);
+
+
+    const usersBalances = [
+      {
+        user: userA.address,
+        balance: await mockToken.balanceOf(userA.address)
+      },
+      {
+        user: userB.address,
+        balance: await mockToken.balanceOf(userB.address)
+      },
+      {
+        user: userC.address,
+        balance: await mockToken.balanceOf(userC.address)
+      },
+    ]
+
+    const details = [
+    ]
+
+    const allHoldersTokenBalance = usersBalances.map(user => user.balance).reduce((a, b) => a.add(b), ethers.BigNumber.from(0)); 
+
+    usersBalances.forEach(user => {
+      const holderBalance = ethers.BigNumber.from(user.balance)
+      const holderBalancePercent = ethers.utils.formatEther(ethers.utils.parseEther(holderBalance.toString()).div(allHoldersTokenBalance).mul(100).toString())
+      const holderRewards = holderBalance.mul(distributedAmount).div(allHoldersTokenBalance)
+      console.log({
+        user: user.user,
+        balance: ethers.utils.formatEther(user.balance.toString()),
+        holderBalancePercent,
+        holderRewards: ethers.utils.formatEther(holderRewards.toString())
+      })
+      details.push({
+        user: user.user,
+        reward: holderRewards
+      })
+    })
+
+    await revenueDistributor.distribute(details);
+
+    const userARewards = await revenueDistributor.pendingRewards(userA.address);
+    const userBRewards = await revenueDistributor.pendingRewards(userB.address);
+    const userCRewards = await revenueDistributor.pendingRewards(userC.address);
+
+    console.log({
+      userARewards: ethers.utils.formatEther(userARewards.toString()),
+      userBRewards: ethers.utils.formatEther(userBRewards.toString()),
+      userCRewards: ethers.utils.formatEther(userCRewards.toString()),
+    })
+  });
+
+  it("claim", async function () {
+    await revenueDistributor.connect(userA).claim();
+    await revenueDistributor.connect(userB).claim();
+
+    const userARewards = await revenueDistributor.pendingRewards(userA.address);
+    const userBRewards = await revenueDistributor.pendingRewards(userB.address);
+    const userCRewards = await revenueDistributor.pendingRewards(userC.address);
+
+    console.log({
+      userARewards: ethers.utils.formatEther(userARewards.toString()),
+      userBRewards: ethers.utils.formatEther(userBRewards.toString()),
+      userCRewards: ethers.utils.formatEther(userCRewards.toString()),
+    })
+
+
+  })
+
+  it("increase eth each 24 hours", async function () {
+    const distributedAmount = ethers.utils.parseUnits("1");
     await owner.sendTransaction({
       to: revenueDistributor.address,
       value: distributedAmount
