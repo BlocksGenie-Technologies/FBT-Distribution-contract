@@ -46,9 +46,7 @@ describe("RevenueDistributor", async function () {
     });
     const contractEthBalance = await ethers.provider.getBalance(revenueDistributor.address);
     console.log("contractEthBalance", contractEthBalance);
-    //expect(contractEthBalance).to.equal(ethers.utils.parseUnits("3"));
-
-
+    console.log("Distribution 1")
     
     const ONE_DAY_IN_SECS = 24 * 60 * 60;
     await time.increaseTo(await time.latest() + ONE_DAY_IN_SECS);
@@ -101,6 +99,7 @@ describe("RevenueDistributor", async function () {
       userBRewards: ethers.utils.formatEther(userBRewards.toString()),
       userCRewards: ethers.utils.formatEther(userCRewards.toString()),
     })
+    console.log("")
   });
 
   it("claim", async function () {
@@ -121,6 +120,7 @@ describe("RevenueDistributor", async function () {
   })
 
   it("increase eth each 24 hours", async function () {
+    console.log("Distribution 2 next day")
     const distributedAmount = ethers.utils.parseUnits("1");
     await owner.sendTransaction({
       to: revenueDistributor.address,
@@ -172,8 +172,6 @@ describe("RevenueDistributor", async function () {
         reward: holderRewards
       })
     })
-
-    console.log("details", details)
 
     await revenueDistributor.distribute(details);
 
