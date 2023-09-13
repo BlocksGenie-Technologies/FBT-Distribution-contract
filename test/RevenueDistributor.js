@@ -115,8 +115,6 @@ describe("RevenueDistributor", async function () {
       userBRewards: ethers.utils.formatEther(userBRewards.toString()),
       userCRewards: ethers.utils.formatEther(userCRewards.toString()),
     })
-
-
   })
 
   it("increase eth each 24 hours", async function () {
@@ -129,8 +127,6 @@ describe("RevenueDistributor", async function () {
     const contractEthBalance = await ethers.provider.getBalance(revenueDistributor.address);
     console.log("contractEthBalance", contractEthBalance);
     //expect(contractEthBalance).to.equal(ethers.utils.parseUnits("3"));
-
-
     
     const ONE_DAY_IN_SECS = 24 * 60 * 60;
     await time.increaseTo(await time.latest() + ONE_DAY_IN_SECS);

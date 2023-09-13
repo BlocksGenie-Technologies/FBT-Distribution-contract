@@ -3,16 +3,11 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "hardhat/console.sol";
 
 contract RevenueDistributor is Ownable, ReentrancyGuard {
     address public manager;
-    uint256 public currentBalance;
-    uint256 public lastDepositedEthTimestamp;
     uint256 public distributedEth;
     uint256 public lastDistributionTimestamp;
-    uint256 public balanceLast24Hours;
-    uint256 public distributionPeriod = 1 days;
 
     struct UserDetails {
         address user;
@@ -30,24 +25,12 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     constructor(address _manager) {
         require(_manager != address(0), "Invalid address");
         manager = _manager;
-        currentBalance = 0;
+        
         distributedEth = 0;
-        balanceLast24Hours = 0;
-        lastDepositedEthTimestamp = 0;
+
     }
 
     receive() external payable {
-        currentBalance += msg.value;
-
-        // If this is the first deposit, set the timestamp
-        // If the last deposit was more than 24 hours ago, reset the timestamp
-        bool is24HoursPassedSinceLastDeposit = (block.timestamp -
-            lastDepositedEthTimestamp) > distributionPeriod;
-
-        if (is24HoursPassedSinceLastDeposit || lastDepositedEthTimestamp == 0) {
-            lastDepositedEthTimestamp = block.timestamp; 
-            balanceLast24Hours = currentBalance - distributedEth;
-        }
     }
 
     function setManagerAddress(address _manager) external onlyOwner {
@@ -73,12 +56,12 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
             uint256 userClaimAmount = _userDetails[i].reward;
             rewardClaimable[_userDetails[i].user].user = _userDetails[i].user;
             rewardClaimable[_userDetails[i].user].reward += userClaimAmount;
+            distributedEth += userClaimAmount;
         }
         lastDistributionTimestamp = block.timestamp;
     }
 
     function claim() external nonReentrant {
-        console.log("user", msg.sender);
         uint256 userClaimAmount = rewardClaimable[msg.sender].reward;
         require(userClaimAmount > 0, "Nothing to claim");
         require(address(this).balance >= userClaimAmount, "Insufficient funds");
