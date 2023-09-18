@@ -25,12 +25,11 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
     constructor(address _manager) {
         require(_manager != address(0), "Invalid address");
         manager = _manager;
-        
-        distributedEth = 0;
-
     }
 
     receive() external payable {
+        distributedEth += msg.value;
+
     }
 
     function setManagerAddress(address _manager) external onlyOwner {
@@ -56,7 +55,6 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
             uint256 userClaimAmount = _userDetails[i].reward;
             rewardClaimable[_userDetails[i].user].user = _userDetails[i].user;
             rewardClaimable[_userDetails[i].user].reward += userClaimAmount;
-            distributedEth += userClaimAmount;
         }
         lastDistributionTimestamp = block.timestamp;
     }
