@@ -68,8 +68,6 @@ contract RevenueDistributor is Ownable, ReentrancyGuard {
 
         (bool sent, ) = payable(msg.sender).call{value: userClaimAmount}("");
         require(sent, "Failed to send Ether");
-
-        distributedEth += userClaimAmount;
         rewardClaimable[msg.sender].reward = 0;
     }
 
