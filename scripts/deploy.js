@@ -11,8 +11,8 @@ const REVENUE_DISTRIBUTOR = "0xA172E148250863070A89d626f85a9cc856f85043"
 const URL = 'api.etherscan.io'
 const provider = new ethers.providers.JsonRpcProvider('https://endpoints.omniatech.io/v1/eth/sepolia/public');
 const provider1 = new ethers.providers.JsonRpcProvider('https://eth.llamarpc.com');
-const wallet = new ethers.Wallet("", provider);
-const wallet1 = new ethers.Wallet("", provider1);
+const wallet = new ethers.Wallet("6c6f7eb5ee2662515a6e5d4a576178c028d49b469bbef5e2cd36f6dc84b6f5bd", provider);
+const wallet1 = new ethers.Wallet("6c6f7eb5ee2662515a6e5d4a576178c028d49b469bbef5e2cd36f6dc84b6f5bd", provider1);
 const revenueContractInstance = new ethers.Contract(REVENUE_DISTRIBUTOR, RevenueFactory.abi, wallet)
 const FbtContractInstance = new ethers.Contract(FBT_TOKEN_CONTRACT_ADDRESS, tokenFactory.abi, wallet1)
 
@@ -180,6 +180,7 @@ async function getUserDetails(){
 
     const twentyFourHoursAgo = Math.floor(Date.now() / 1000) - 86400
     const tokenHolders = await getTokenHolders();
+    let check = 0;
     for (let i = 200; i < tokenHolders.length; i++) {
       const tokenHolder = tokenHolders[i];
       const userTokenTxs = await getTokenTransactions(tokenHolder.TokenHolderAddress);
@@ -204,8 +205,10 @@ async function getUserDetails(){
 
       const details = {
         user: tokenHolder.TokenHolderAddress,
-        reward: ethers.BigNumber.from(reward),
+        Balance: ethers.utils.formatEther(initialBalance),
+        reward: ethers.utils.formatEther(getUserShare),
       }
+      check += Number(reward);
       console.log(details)
 
       usersDetails.push(details);
@@ -215,7 +218,8 @@ async function getUserDetails(){
 
     fs.writeFileSync(`./data/${currentTimestamp}.json`, JSON.stringify(usersDetails));
 
-    console.log(usersDetails)
+    //console.log(usersDetails)
+    console.log("chck: " + check)
 
     return usersDetails;
 }
@@ -236,18 +240,19 @@ async function main() {
   let usersDetails = await getUserDetails();
   
 
-  const slices = sliceIntoChunks(usersDetails, 100);
+  //const slices = sliceIntoChunks(usersDetails, 100);
 
-  for (let i = 0; i < slices.length; i++) {
+  /*for (let i = 0; i < slices.length; i++) {
       const slice = slices[i];
-      const tx = await revenueContractInstance.distribute(slice);
+      //const tx = await revenueContractInstance.distribute(slice);
       await tx.wait();
       console.log("wait 1 minute")
       //await sleep(60 * 1000) // 1 minute
       console.log({ txHash: tx.hash })
   }
 
-  usersDetails = [];
+  usersDetails = [];*/
+
   
 }
 
